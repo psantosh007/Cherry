@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoTag — Pin Your World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<!-- MapLibre GL JS for OpenFreeMap vector tiles -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.5.2/dist/maplibre-gl.css"/>
+<script src="https://unpkg.com/maplibre-gl@4.5.2/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --bg: #0b0c10;
+    --surface: #12141a;
+    --surface2: #1a1d26;
+    --border: #252836;
+    --accent: #e8ff47;
+    --accent2: #47c8ff;
+    --accent3: #ff6b6b;
+    --text: #e2e4f0;
+    --muted: #5a5d75;
+    --panel-w: 340px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    z-index: 1000;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo span { color: var(--text); font-weight: 400; }
+
+  .logo-pulse {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(232,255,71,0.4); }
+    50%      { box-shadow: 0 0 0 8px rgba(232,255,71,0); }
+  }
+
+  .ofm-badge {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .ofm-badge strong { color: var(--accent2); }
+
+  #status-text { font-size: 11px; color: var(--muted); }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .stat-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .stat-pill strong { color: var(--accent); }
+
+  .style-switcher {
+    display: flex;
+    gap: 4px;
+  }
+  .style-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+  .style-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .style-btn.active { background: var(--accent2); border-color: var(--accent2); color: #0b0c10; }
+
+  .btn-locate {
+    background: var(--accent);
+    color: #0b0c10;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+  }
+  .btn-locate:hover { opacity: 0.85; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: column;
+  }
+
+  /* ── MAP ── */
+  #map {
+    width: 100%;
+    height: 45vh
+    flex-shrink: 0;
+
+  }
+
+  /* MapLibre controls */
+  .maplibregl-ctrl-group { background: var(--surface2) !important; border: 1px solid var(--border) !important; }
+  .maplibregl-ctrl-group button { background: transparent !important; color: var(--text) !important; }
+  .maplibregl-ctrl-group button:hover { background: var(--surface) !important; }
+  .maplibregl-ctrl-attrib { background: rgba(11,12,16,0.7) !important; color: var(--muted) !important; font-size: 10px !important; }
+  .maplibregl-ctrl-attrib a { color: var(--accent2) !important; }
+
+  /* ── COORDS OVERLAY ── */
+  #coords-overlay {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(11,12,16,0.85);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 5px 14px;
+    border-radius: 100px;
+    font-size: 11px;
+    color: var(--muted);
+    z-index: 500;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #coords-overlay span { color: var(--accent2); }
+
+  /* ── SIDE PANEL ── */
+  .panel {
+    width: 100%;
+    height: 260px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex: 1;
+
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 10px; }
+
+  .form-group label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.15s;
+    resize: none;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus { border-color: var(--accent2); }
+
+  .coords-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .category-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .cat-pill {
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .cat-pill:hover { border-color: var(--muted); color: var(--text); }
+  .cat-pill.active { background: var(--accent2); border-color: var(--accent2); color: #0b0c10; font-weight: 500; }
+
+  .btn-add {
+    width: 100%;
+    background: var(--accent);
+    color: #0b0c10;
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-add:active { transform: translateY(0); }
+
+  .hint { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  /* ── TAG LIST ── */
+  .tag-list-wrap {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .tag-list {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tag-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    animation: fadeSlide 0.25s ease forwards;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .tag-item:hover { border-color: var(--accent2); background: #1e2030; }
+  .tag-item.active { border-color: var(--accent); }
+
+  .tag-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .tag-body { flex: 1; min-width: 0; }
+
+  .tag-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tag-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .tag-note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn-del {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-del:hover { color: var(--accent3); background: rgba(255,107,107,0.1); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+  .empty-state .big { font-size: 32px; margin-bottom: 12px; }
+
+  /* ── POPUP ── */
+  .maplibregl-popup-content {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    color: var(--text) !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    font-family: 'DM Mono', monospace;
+  }
+  .maplibregl-popup-tip { border-top-color: var(--surface) !important; border-bottom-color: var(--surface) !important; }
+  .maplibregl-popup-close-button { color: var(--muted) !important; font-size: 16px !important; right: 8px !important; top: 6px !important; }
+  .popup-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; }
+  .popup-cat { display: inline-block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 100px; margin-top: 4px; font-weight: 500; }
+  .popup-coords { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .popup-note { font-size: 12px; margin-top: 6px; color: #9a9bb8; border-top: 1px solid var(--border); padding-top: 6px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 9999;
+    transform: translateY(60px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 480px) {
+
+  .layout {
+    flex-direction: column;
+    }
+
+    #map {
+    width: 100%;
+    height: 45vh;
+    flex-shrink 0;
+    }
+    .panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex: 1;
+    overflow-y:auto;
+    }
+    
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-pulse"></div>
+    CHERRY<span>TAG</span>
+  </div>
+  <div class="ofm-badge">Powered by <strong>OpenFreeMap</strong></div>
+  <div id="status-text">click map to place pin</div>
+  <div class="header-right">
+    <div class="style-switcher">
+      <button class="style-btn active" onclick="setStyle('liberty')">LIBERTY</button>
+      <button class="style-btn" onclick="setStyle('bright')">BRIGHT</button>
+      <button class="style-btn" onclick="setStyle('positron')">POSITRON</button>
+    </div>
+    <div class="stat-pill">PINS: <strong id="tag-count">0</strong></div>
+    <button class="btn-locate" onclick="locateMe()">⊕ MY LOCATION</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- MAP WRAPPER -->
+  <div style="position:relative;flex:1;overflow:hidden;">
+    <div id="map" style="width:100%;height:100%;"></div>
+    <div id="coords-overlay">hover map — <span id="live-coords">–.–––– , –.––––</span></div>
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="panel">
+    <div class="panel-section">
+      <div class="panel-label">// drop a pin</div>
+
+      <div class="form-group">
+        <label>Label</label>
+        <input type="text" id="f-label" placeholder="My spot…" maxlength="48">
+      </div>
+
+      <div class="form-group">
+        <label>Coordinates</label>
+        <div class="coords-row">
+          <input type="number" id="f-lat" placeholder="Lat" step="any">
+          <input type="number" id="f-lng" placeholder="Lng" step="any">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Note</label>
+        <textarea id="f-note" rows="2" placeholder="Add a note…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Category</label>
+        <div class="category-pills">
+          <button class="cat-pill active" data-cat="general">General</button>
+          <button class="cat-pill" data-cat="landmark">Landmark</button>
+          <button class="cat-pill" data-cat="food">Food</button>
+          <button class="cat-pill" data-cat="nature">Nature</button>
+          <button class="cat-pill" data-cat="alert">Alert</button>
+        </div>
+      </div>
+
+      <button class="btn-add" onclick="submitTag()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="6" stroke="#0b0c10" stroke-width="1.5"/>
+          <path d="M7 4v6M4 7h6" stroke="#0b0c10" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        SAVE PIN
+      </button>
+      <p class="hint">or click anywhere on the map</p>
+    </div>
+
+    <div class="panel-label" style="padding:12px 16px 0;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">// saved pins</div>
+    <div class="tag-list-wrap">
+      <div class="tag-list" id="tag-list">
+        <div class="empty-state">
+          <div class="big">🗺️</div>
+          No pins yet.<br>Click the map or press<br><strong>MY LOCATION</strong> to start.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ──
+const API = 'http://localhost:5000/api';
+const OFM_STYLES = {
+  liberty:  'https://tiles.openfreemap.org/styles/liberty',
+  bright:   'https://tiles.openfreemap.org/styles/bright',
+  positron: 'https://tiles.openfreemap.org/styles/positron'
+};
+const CAT_COLORS = {
+  general:  '#47c8ff',
+  landmark: '#e8ff47',
+  food:     '#ffb347',
+  nature:   '#7fff7f',
+  alert:    '#ff6b6b'
+};
+const CAT_EMOJI = {
+  general:'◉', landmark:'★', food:'◆', nature:'▲', alert:'!'
+};
+
+let selectedCat  = 'general';
+let currentStyle = 'liberty';
+let markers      = {};   // id → {marker, el}
+let offlineTags  = [];
+let activeId     = null;
+
+// ── MAP INIT (MapLibre GL + OpenFreeMap) ──
+const map = new maplibregl.Map({
+  container: 'map',
+  style: OFM_STYLES.liberty,
+  center: [0, 20],
+  zoom: 2,
+  attributionControl: true
+});
+
+map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+// Live coords
+map.on('mousemove', e => {
+  document.getElementById('live-coords').textContent =
+    `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
+});
+
+// Click to prefill
+map.on('click', e => {
+  const { lat, lng } = e.lngLat;
+  document.getElementById('f-lat').value = lat.toFixed(6);
+  document.getElementById('f-lng').value = lng.toFixed(6);
+  document.getElementById('f-label').focus();
+  document.getElementById('status-text').textContent =
+    `selected: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+});
+
+// ── STYLE SWITCHER ──
+function setStyle(name) {
+  if (name === currentStyle) return;
+  currentStyle = name;
+  map.setStyle(OFM_STYLES[name]);
+  document.querySelectorAll('.style-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === name);
+  });
+  // Re-add markers after style loads
+  map.once('styledata', () => {
+    getAllTags().forEach(addMarker);
+  });
+  toast(`Map style: ${name}`);
+}
+
+// ── CATEGORY PILLS ──
+document.querySelectorAll('.cat-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCat = btn.dataset.cat;
+  });
+});
+
+// ── CUSTOM HTML MARKER ──
+function makeMarkerEl(category) {
+  const color = CAT_COLORS[category] || '#47c8ff';
+  const icon  = CAT_EMOJI[category]  || '●';
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38" style="cursor:pointer;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5))">
+      <path d="M15 0C6.72 0 0 6.72 0 15c0 10.5 15 23 15 23S30 25.5 30 15C30 6.72 23.28 0 15 0z" fill="${color}"/>
+      <circle cx="15" cy="14.5" r="7" fill="rgba(0,0,0,0.25)"/>
+      <text x="15" y="19" text-anchor="middle" font-size="10" font-family="monospace"
+        fill="#fff" dominant-baseline="middle" font-weight="bold">${icon}</text>
+    </svg>`;
+  return el;
+}
+
+function addMarker(tag) {
+  const el = makeMarkerEl(tag.category);
+  const popup = new maplibregl.Popup({ offset: 38, closeButton: true, maxWidth: '240px' })
+    .setHTML(`
+      <div class="popup-title">${esc(tag.label)}</div>
+      <div class="popup-cat" style="background:${CAT_COLORS[tag.category]}22;color:${CAT_COLORS[tag.category]}">${tag.category}</div>
+      <div class="popup-coords">${tag.lat.toFixed(5)}, ${tag.lng.toFixed(5)}</div>
+      ${tag.note ? `<div class="popup-note">${esc(tag.note)}</div>` : ''}
+    `);
+
+  const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+    .setLngLat([tag.lng, tag.lat])
+    .setPopup(popup)
+    .addTo(map);
+
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    setActive(tag.id);
+  });
+
+  markers[tag.id] = { marker, el };
+}
+
+function removeAllMarkers() {
+  Object.values(markers).forEach(({ marker }) => marker.remove());
+  markers = {};
+}
+
+// ── DATA ──
+function getAllTags() {
+  return offlineTags;
+}
+
+async function loadTags() {
+  try {
+    const res  = await fetch(`${API}/tags`);
+    const tags = await res.json();
+    offlineTags = tags;
+  } catch {
+    // use existing offlineTags
+  }
+  removeAllMarkers();
+  offlineTags.forEach(addMarker);
+  renderList(offlineTags);
+}
+
+function renderList(tags) {
+  document.getElementById('tag-count').textContent = tags.length;
+  const list = document.getElementById('tag-list');
+  if (!tags.length) {
+    list.innerHTML = `<div class="empty-state"><div class="big">🗺️</div>No pins yet.<br>Click the map to start.</div>`;
+    return;
+  }
+  list.innerHTML = [...tags].reverse().map(tag => `
+    <div class="tag-item${activeId === tag.id ? ' active' : ''}" data-id="${tag.id}" onclick="flyTo('${tag.id}')">
+      <div class="tag-dot" style="background:${CAT_COLORS[tag.category] || '#47c8ff'}"></div>
+      <div class="tag-body">
+        <div class="tag-name">${esc(tag.label)}</div>
+        <div class="tag-meta">${tag.lat.toFixed(4)}, ${tag.lng.toFixed(4)} · ${tag.category}</div>
+        ${tag.note ? `<div class="tag-note">${esc(tag.note)}</div>` : ''}
+      </div>
+      <button class="btn-del" onclick="event.stopPropagation();deleteTag('${tag.id}')" title="Delete">✕</button>
+    </div>
+  `).join('');
+}
+
+// ── SUBMIT ──
+async function submitTag() {
+  const lat   = parseFloat(document.getElementById('f-lat').value);
+  const lng   = parseFloat(document.getElementById('f-lng').value);
+  const label = document.getElementById('f-label').value.trim() || 'Untitled';
+  const note  = document.getElementById('f-note').value.trim();
+
+  if (isNaN(lat) || isNaN(lng)) { toast('Click the map first!', '#ff6b6b'); return; }
+
+  const body = { lat, lng, label, note, category: selectedCat };
+  let tag;
+
+  try {
+    const res = await fetch(`${API}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    tag = await res.json();
+    offlineTags.push(tag);
+  } catch {
+    tag = { ...body, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    offlineTags.push(tag);
+  }
+
+  addMarker(tag);
+  renderList(offlineTags);
+  map.flyTo({ center: [lng, lat], zoom: 14, duration: 1400, essential: true });
+  setActive(tag.id);
+  clearForm();
+  toast('📍 Pin saved!');
+}
+
+// ── DELETE ──
+async function deleteTag(id) {
+  try { await fetch(`${API}/tags/${id}`, { method: 'DELETE' }); } catch {}
+  if (markers[id]) { markers[id].marker.remove(); delete markers[id]; }
+  offlineTags = offlineTags.filter(t => t.id !== id);
+  if (activeId === id) activeId = null;
+  renderList(offlineTags);
+  toast('Pin removed', '#ff6b6b');
+}
+
+// ── FLY TO ──
+function flyTo(id) {
+  const tag = offlineTags.find(t => t.id === id);
+  if (!tag) return;
+  map.flyTo({ center: [tag.lng, tag.lat], zoom: 14, duration: 1000, essential: true });
+  markers[id]?.marker.togglePopup();
+  setActive(id);
+}
+
+function setActive(id) {
+  activeId = id;
+  document.querySelectorAll('.tag-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.id === id));
+}
+
+// ── LOCATE ──
+function locateMe() {
+  document.getElementById('status-text').textContent = 'locating…';
+  if (!navigator.geolocation) { toast('Geolocation not supported', '#ff6b6b'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    document.getElementById('f-lat').value = lat.toFixed(6);
+    document.getElementById('f-lng').value = lng.toFixed(6);
+    document.getElementById('status-text').textContent = 'location found — fill label & save';
+    map.flyTo({ center: [lng, lat], zoom: 13, duration: 1200 });
+    toast('📡 Location found!');
+  }, () => toast('Could not access location', '#ff6b6b'));
+}
+
+// ── HELPERS ──
+function clearForm() {
+  ['f-label','f-lat','f-lng','f-note'].forEach(id => document.getElementById(id).value = '');
+}
+
+let toastTimer;
+function toast(msg, color = 'var(--accent)') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderLeftColor = color;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── INIT ──
+loadTags();
+</script>
+</body>
+</html>
