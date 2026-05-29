@@ -6,7 +6,18 @@ import os
 from datetime import datetime
 
 app = Flask(__name__, static_folder='static')
-CORS(app)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://cherry-egux.onrender.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
+@app.before_request
+def handle_options():
+    if request.method == "OPTIONS":
+        return "", 204
 
 DB_PATH = 'geotags.db'
 
