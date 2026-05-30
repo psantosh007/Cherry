@@ -7,15 +7,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: SECRET_KEY
-        generateValue: true
-      - key: AWS_IOT_ENDPOINT
-        sync: false
-      - key: AWS_IOT_CERT
-        sync: false
-      - key: AWS_IOT_KEY
-        sync: false
-      - key: AWS_IOT_CA
-        sync: false
-      - key: AWS_IOT_CLIENT_ID
-        sync: false

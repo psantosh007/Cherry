@@ -1,213 +1,767 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoTag — Pin Your World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<!-- MapLibre GL JS for OpenFreeMap vector tiles -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.5.2/dist/maplibre-gl.css"/>
+<script src="https://unpkg.com/maplibre-gl@4.5.2/dist/maplibre-gl.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  .cherry-app { max-width: 380px; margin: 0 auto; font-family: 'DM Sans', sans-serif; color: var(--color-text-primary); }
+  :root {
+    --bg: #0b0c10;
+    --surface: #12141a;
+    --surface2: #1a1d26;
+    --border: #252836;
+    --accent: #e8ff47;
+    --accent2: #47c8ff;
+    --accent3: #ff6b6b;
+    --text: #e2e4f0;
+    --muted: #5a5d75;
+    --panel-w: 340px;
+  }
 
-  /* HEADER */
-  .cherry-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
-  .logo-mark { display: flex; align-items: center; gap: 8px; }
-  .logo-icon { width: 32px; height: 32px; }
-  .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; letter-spacing: -0.3px; }
-  .logo-dot { color: #C0392B; }
-  .header-badge { font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; background: #FDE8E8; color: #C0392B; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  /* SCANNER */
-  .scanner-section { padding: 20px 20px 0; }
-  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 14px; }
-  .scanner-viewport { position: relative; width: 100%; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: #0d0d0d; }
-  .camera-placeholder { width: 100%; height: 100%; background: linear-gradient(145deg, #111 0%, #1a1a1a 50%, #0d0d0d 100%); }
-  .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 58%; aspect-ratio: 1; }
-  .corner { position: absolute; width: 22px; height: 22px; }
-  .corner-tl { top: 0; left: 0; border-top: 2.5px solid #E74C3C; border-left: 2.5px solid #E74C3C; border-radius: 3px 0 0 0; }
-  .corner-tr { top: 0; right: 0; border-top: 2.5px solid #E74C3C; border-right: 2.5px solid #E74C3C; border-radius: 0 3px 0 0; }
-  .corner-bl { bottom: 0; left: 0; border-bottom: 2.5px solid #E74C3C; border-left: 2.5px solid #E74C3C; border-radius: 0 0 0 3px; }
-  .corner-br { bottom: 0; right: 0; border-bottom: 2.5px solid #E74C3C; border-right: 2.5px solid #E74C3C; border-radius: 0 0 3px 0; }
-  .scan-line { position: absolute; top: 0; left: 0; right: 0; height: 1.5px; background: linear-gradient(90deg, transparent 0%, #E74C3C 20%, #FF6B6B 50%, #E74C3C 80%, transparent 100%); animation: scanMove 2s ease-in-out infinite; box-shadow: 0 0 8px rgba(231,76,60,0.8); }
-  @keyframes scanMove { 0% { top: 4%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 96%; opacity: 0; } }
-  .scan-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 62%; aspect-ratio: 1; border-radius: 10px; animation: glowPulse 2.4s ease-out infinite; pointer-events: none; }
-  @keyframes glowPulse { 0% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); } 50% { box-shadow: 0 0 18px 6px rgba(231,76,60,0.15); } 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); } }
-  .scan-status { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.65); border: 0.5px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 6px 14px; }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2ECC71; box-shadow: 0 0 6px rgba(46,204,113,0.8); animation: blink 1.5s ease-in-out infinite; }
-  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .status-text { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 500; white-space: nowrap; }
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-  /* CTA */
-  .cta-wrap { padding: 16px 20px 0; }
-  .scan-btn { width: 100%; padding: 15px; border-radius: 14px; border: none; background: #C0392B; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; transition: background 0.15s, transform 0.1s; }
-  .scan-btn:hover { background: #A93226; }
-  .scan-btn:active { transform: scale(0.98); }
-  .scan-btn i { font-size: 19px; }
+  /* ── TOP BAR ── */
+  header {
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    z-index: 1000;
+    flex-shrink: 0;
+  }
 
-  /* SPLIT REWARD CARD */
-  .reward-section { padding: 18px 20px 0; }
-  .reward-split { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo span { color: var(--text); font-weight: 400; }
 
-  /* LEFT — points */
-  .points-card { background: #C0392B; border-radius: var(--border-radius-lg); padding: 16px; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
-  .points-card-label { font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.65); margin-bottom: 8px; }
-  .points-value { font-size: 36px; font-weight: 500; color: #fff; line-height: 1; }
-  .points-unit { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 3px; }
-  .points-bar-wrap { margin-top: 12px; }
-  .points-bar-track { height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; overflow: hidden; }
-  .points-bar-fill { height: 100%; width: 68%; background: rgba(255,255,255,0.85); border-radius: 2px; }
-  .points-bar-meta { display: flex; justify-content: space-between; margin-top: 5px; }
-  .points-bar-meta span { font-size: 10px; color: rgba(255,255,255,0.6); }
+  .logo-pulse {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(232,255,71,0.4); }
+    50%      { box-shadow: 0 0 0 8px rgba(232,255,71,0); }
+  }
 
-  /* RIGHT — QR */
-  .qr-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 140px; gap: 10px; }
-  .qr-card-label { font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--color-text-tertiary); }
-  .qr-image-wrap { width: 82px; height: 82px; display: flex; align-items: center; justify-content: center; }
-  .qr-user-id { font-size: 10px; color: var(--color-text-tertiary); letter-spacing: 0.5px; }
+  .ofm-badge {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .ofm-badge strong { color: var(--accent2); }
 
-  /* MAP */
-  .map-section { padding: 18px 20px 28px; }
-  .map-frame { border-radius: var(--border-radius-lg); overflow: hidden; border: 0.5px solid var(--color-border-tertiary); height: 150px; position: relative; }
-  .map-overlay { position: absolute; bottom: 10px; left: 10px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
-  .map-overlay i { color: #C0392B; font-size: 14px; }
+  #status-text { font-size: 11px; color: var(--muted); }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .stat-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .stat-pill strong { color: var(--accent); }
+
+  .style-switcher {
+    display: flex;
+    gap: 4px;
+  }
+  .style-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+  .style-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .style-btn.active { background: var(--accent2); border-color: var(--accent2); color: #0b0c10; }
+
+  .btn-locate {
+    background: var(--accent);
+    color: #0b0c10;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+  }
+  .btn-locate:hover { opacity: 0.85; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: column;
+  }
+
+  /* ── MAP ── */
+  #map {
+    width: 100%;
+    height: 45vh
+    flex-shrink: 0;
+
+  }
+
+  /* MapLibre controls */
+  .maplibregl-ctrl-group { background: var(--surface2) !important; border: 1px solid var(--border) !important; }
+  .maplibregl-ctrl-group button { background: transparent !important; color: var(--text) !important; }
+  .maplibregl-ctrl-group button:hover { background: var(--surface) !important; }
+  .maplibregl-ctrl-attrib { background: rgba(11,12,16,0.7) !important; color: var(--muted) !important; font-size: 10px !important; }
+  .maplibregl-ctrl-attrib a { color: var(--accent2) !important; }
+
+  /* ── COORDS OVERLAY ── */
+  #coords-overlay {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(11,12,16,0.85);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 5px 14px;
+    border-radius: 100px;
+    font-size: 11px;
+    color: var(--muted);
+    z-index: 500;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #coords-overlay span { color: var(--accent2); }
+
+  /* ── SIDE PANEL ── */
+  .panel {
+    width: 100%;
+    height: 260px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex: 1;
+
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 10px; }
+
+  .form-group label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.15s;
+    resize: none;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus { border-color: var(--accent2); }
+
+  .coords-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .category-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .cat-pill {
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .cat-pill:hover { border-color: var(--muted); color: var(--text); }
+  .cat-pill.active { background: var(--accent2); border-color: var(--accent2); color: #0b0c10; font-weight: 500; }
+
+  .btn-add {
+    width: 100%;
+    background: var(--accent);
+    color: #0b0c10;
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-add:active { transform: translateY(0); }
+
+  .hint { font-size: 10px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  /* ── TAG LIST ── */
+  .tag-list-wrap {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .tag-list {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tag-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    animation: fadeSlide 0.25s ease forwards;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .tag-item:hover { border-color: var(--accent2); background: #1e2030; }
+  .tag-item.active { border-color: var(--accent); }
+
+  .tag-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .tag-body { flex: 1; min-width: 0; }
+
+  .tag-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tag-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .tag-note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn-del {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-del:hover { color: var(--accent3); background: rgba(255,107,107,0.1); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+  .empty-state .big { font-size: 32px; margin-bottom: 12px; }
+
+  /* ── POPUP ── */
+  .maplibregl-popup-content {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    color: var(--text) !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    font-family: 'DM Mono', monospace;
+  }
+  .maplibregl-popup-tip { border-top-color: var(--surface) !important; border-bottom-color: var(--surface) !important; }
+  .maplibregl-popup-close-button { color: var(--muted) !important; font-size: 16px !important; right: 8px !important; top: 6px !important; }
+  .popup-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; }
+  .popup-cat { display: inline-block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 100px; margin-top: 4px; font-weight: 500; }
+  .popup-coords { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .popup-note { font-size: 12px; margin-top: 6px; color: #9a9bb8; border-top: 1px solid var(--border); padding-top: 6px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    z-index: 9999;
+    transform: translateY(60px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 480px) {
+
+  .layout {
+    flex-direction: column;
+    }
+
+    #map {
+    width: 100%;
+    height: 45vh;
+    flex-shrink 0;
+    }
+    .panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    flex: 1;
+    overflow-y:auto;
+    }
+    
+  }
 </style>
+</head>
+<body>
 
-<div class="cherry-app">
-
-  <!-- HEADER -->
-  <header class="cherry-header">
-    <div class="logo-mark">
-      <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="11" cy="22" r="7" fill="#C0392B"/>
-        <circle cx="22" cy="20" r="6" fill="#E74C3C"/>
-        <path d="M11 22 Q14 10 22 8" stroke="#6B3A2A" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-        <path d="M22 8 Q26 6 28 4" stroke="#6B3A2A" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-      </svg>
-      <span class="logo-text">Cherry<span class="logo-dot">.</span></span>
+<header>
+  <div class="logo">
+    <div class="logo-pulse"></div>
+    CHERRY<span>TAG</span>
+  </div>
+  <div class="ofm-badge">Powered by <strong>OpenFreeMap</strong></div>
+  <div id="status-text">click map to place pin</div>
+  <div class="header-right">
+    <div class="style-switcher">
+      <button class="style-btn active" onclick="setStyle('liberty')">LIBERTY</button>
+      <button class="style-btn" onclick="setStyle('bright')">BRIGHT</button>
+      <button class="style-btn" onclick="setStyle('positron')">POSITRON</button>
     </div>
-    <span class="header-badge">Rewards</span>
-  </header>
+    <div class="stat-pill">PINS: <strong id="tag-count">0</strong></div>
+    <button class="btn-locate" onclick="locateMe()">⊕ MY LOCATION</button>
+  </div>
+</header>
 
-  <!-- SCANNER -->
-  <section class="scanner-section">
-    <p class="section-label">Camera scanner</p>
-    <div class="scanner-viewport">
-      <div class="camera-placeholder"></div>
-      <div class="scan-glow"></div>
-      <div class="scan-frame">
-        <div class="corner corner-tl"></div>
-        <div class="corner corner-tr"></div>
-        <div class="corner corner-bl"></div>
-        <div class="corner corner-br"></div>
-        <div class="scan-line"></div>
-      </div>
-      <div class="scan-status">
-        <div class="status-dot"></div>
-        <span class="status-text">Point at a QR code</span>
-      </div>
-    </div>
-  </section>
+<div class="layout">
 
-  <!-- CTA -->
-  <div class="cta-wrap">
-    <button class="scan-btn" onclick="this.innerHTML='<i class=\'ti ti-loader\' style=\'font-size:18px;\'></i> Camera opening…'">
-      <i class="ti ti-qrcode" aria-hidden="true"></i>
-      Scan Reward Code
-    </button>
+  <!-- MAP WRAPPER -->
+  <div style="position:relative;flex:1;overflow:hidden;">
+    <div id="map" style="width:100%;height:100%;"></div>
+    <div id="coords-overlay">hover map — <span id="live-coords">–.–––– , –.––––</span></div>
   </div>
 
-  <!-- SPLIT: POINTS + QR -->
-  <section class="reward-section">
-    <div class="reward-split">
+  <!-- SIDE PANEL -->
+  <div class="panel">
+    <div class="panel-section">
+      <div class="panel-label">// drop a pin</div>
 
-      <!-- LEFT: Points -->
-      <div class="points-card">
-        <div>
-          <p class="points-card-label">Your points</p>
-          <p class="points-value">1,720</p>
-          <p class="points-unit">pts</p>
-        </div>
-        <div class="points-bar-wrap">
-          <div class="points-bar-track"><div class="points-bar-fill"></div></div>
-          <div class="points-bar-meta">
-            <span>0</span>
-            <span>Next reward at 2,500</span>
-          </div>
+      <div class="form-group">
+        <label>Label</label>
+        <input type="text" id="f-label" placeholder="My spot…" maxlength="48">
+      </div>
+
+      <div class="form-group">
+        <label>Coordinates</label>
+        <div class="coords-row">
+          <input type="number" id="f-lat" placeholder="Lat" step="any">
+          <input type="number" id="f-lng" placeholder="Lng" step="any">
         </div>
       </div>
 
-      <!-- RIGHT: QR -->
-      <div class="qr-card">
-        <p class="qr-card-label">Member ID</p>
-        <div class="qr-image-wrap">
-          <svg viewBox="0 0 62 62" width="82" height="82" xmlns="http://www.w3.org/2000/svg">
-            <rect width="62" height="62" fill="white" rx="4"/>
-            <rect x="4" y="4" width="18" height="18" fill="#1a1a1a" rx="2"/>
-            <rect x="7" y="7" width="12" height="12" fill="white" rx="1"/>
-            <rect x="10" y="10" width="6" height="6" fill="#1a1a1a"/>
-            <rect x="40" y="4" width="18" height="18" fill="#1a1a1a" rx="2"/>
-            <rect x="43" y="7" width="12" height="12" fill="white" rx="1"/>
-            <rect x="46" y="10" width="6" height="6" fill="#1a1a1a"/>
-            <rect x="4" y="40" width="18" height="18" fill="#1a1a1a" rx="2"/>
-            <rect x="7" y="43" width="12" height="12" fill="white" rx="1"/>
-            <rect x="10" y="46" width="6" height="6" fill="#1a1a1a"/>
-            <rect x="26" y="4" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="32" y="4" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="26" y="10" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="26" y="26" width="4" height="4" fill="#C0392B"/>
-            <rect x="32" y="26" width="4" height="4" fill="#C0392B"/>
-            <rect x="38" y="26" width="4" height="4" fill="#C0392B"/>
-            <rect x="32" y="32" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="44" y="26" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="50" y="26" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="44" y="32" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="50" y="32" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="26" y="44" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="32" y="44" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="38" y="44" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="38" y="50" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="44" y="50" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="50" y="50" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="4" y="26" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="10" y="26" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="16" y="26" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="4" y="32" width="4" height="4" fill="#1a1a1a"/>
-            <rect x="16" y="32" width="4" height="4" fill="#1a1a1a"/>
-          </svg>
-        </div>
-        <p class="qr-user-id">CHR-00482-J</p>
+      <div class="form-group">
+        <label>Note</label>
+        <textarea id="f-note" rows="2" placeholder="Add a note…"></textarea>
       </div>
 
+      <div class="form-group">
+        <label>Category</label>
+        <div class="category-pills">
+          <button class="cat-pill active" data-cat="general">General</button>
+          <button class="cat-pill" data-cat="landmark">Landmark</button>
+          <button class="cat-pill" data-cat="food">Food</button>
+          <button class="cat-pill" data-cat="nature">Nature</button>
+          <button class="cat-pill" data-cat="alert">Alert</button>
+        </div>
+      </div>
+
+      <button class="btn-add" onclick="submitTag()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="6" stroke="#0b0c10" stroke-width="1.5"/>
+          <path d="M7 4v6M4 7h6" stroke="#0b0c10" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        SAVE PIN
+      </button>
+      <p class="hint">or click anywhere on the map</p>
     </div>
-  </section>
 
-  <!-- MAP -->
-  <section class="map-section">
-    <p class="section-label">Nearby locations</p>
-    <div class="map-frame">
-      <svg width="100%" height="100%" viewBox="0 0 340 150" xmlns="http://www.w3.org/2000/svg">
-        <rect width="340" height="150" fill="#E8E4DC"/>
-        <rect x="0" y="0" width="80" height="52" fill="#D9D4C8" rx="2"/>
-        <rect x="90" y="0" width="100" height="52" fill="#D9D4C8" rx="2"/>
-        <rect x="200" y="0" width="140" height="52" fill="#D9D4C8" rx="2"/>
-        <rect x="0" y="62" width="60" height="46" fill="#D9D4C8" rx="2"/>
-        <rect x="70" y="62" width="80" height="46" fill="#D9D4C8" rx="2"/>
-        <rect x="160" y="62" width="90" height="46" fill="#D9D4C8" rx="2"/>
-        <rect x="260" y="62" width="80" height="46" fill="#D9D4C8" rx="2"/>
-        <rect x="20" y="118" width="90" height="32" fill="#D9D4C8" rx="2"/>
-        <rect x="120" y="118" width="70" height="32" fill="#D9D4C8" rx="2"/>
-        <rect x="200" y="118" width="140" height="32" fill="#D9D4C8" rx="2"/>
-        <rect x="80" y="0" width="10" height="150" fill="#F2EDE3"/>
-        <rect x="190" y="0" width="10" height="150" fill="#F2EDE3"/>
-        <rect x="0" y="54" width="340" height="8" fill="#F2EDE3"/>
-        <rect x="0" y="110" width="340" height="8" fill="#F2EDE3"/>
-        <circle cx="140" cy="38" r="9" fill="#C0392B"/>
-        <circle cx="140" cy="38" r="5" fill="white"/>
-        <circle cx="220" cy="82" r="7" fill="#E74C3C" opacity="0.7"/>
-        <circle cx="220" cy="82" r="3.5" fill="white"/>
-        <circle cx="60" cy="84" r="7" fill="#E74C3C" opacity="0.5"/>
-        <circle cx="60" cy="84" r="3.5" fill="white"/>
-      </svg>
-      <div class="map-overlay">
-        <i class="ti ti-map-pin" aria-hidden="true"></i>
-        3 Cherry stores nearby
+    <div class="panel-label" style="padding:12px 16px 0;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">// saved pins</div>
+    <div class="tag-list-wrap">
+      <div class="tag-list" id="tag-list">
+        <div class="empty-state">
+          <div class="big">🗺️</div>
+          No pins yet.<br>Click the map or press<br><strong>MY LOCATION</strong> to start.
+        </div>
       </div>
     </div>
-  </section>
-
+  </div>
 </div>
+
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ──
+const API = 'https://cherry-egux.onrender.com/api';
+const OFM_STYLES = {
+  liberty:  'https://tiles.openfreemap.org/styles/liberty',
+  bright:   'https://tiles.openfreemap.org/styles/bright',
+  positron: 'https://tiles.openfreemap.org/styles/positron'
+};
+const CAT_COLORS = {
+  general:  '#47c8ff',
+  landmark: '#e8ff47',
+  food:     '#ffb347',
+  nature:   '#7fff7f',
+  alert:    '#ff6b6b'
+};
+const CAT_EMOJI = {
+  general:'◉', landmark:'★', food:'◆', nature:'▲', alert:'!'
+};
+
+let selectedCat  = 'general';
+let currentStyle = 'liberty';
+let markers      = {};   // id → {marker, el}
+let offlineTags  = [];
+let activeId     = null;
+
+// ── MAP INIT (MapLibre GL + OpenFreeMap) ──
+const map = new maplibregl.Map({
+  container: 'map',
+  style: OFM_STYLES.liberty,
+  center: [0, 20],
+  zoom: 2,
+  attributionControl: true
+});
+
+map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+// Live coords
+map.on('mousemove', e => {
+  document.getElementById('live-coords').textContent =
+    `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
+});
+
+// Click to prefill
+map.on('click', e => {
+  const { lat, lng } = e.lngLat;
+  document.getElementById('f-lat').value = lat.toFixed(6);
+  document.getElementById('f-lng').value = lng.toFixed(6);
+  document.getElementById('f-label').focus();
+  document.getElementById('status-text').textContent =
+    `selected: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+});
+
+// ── STYLE SWITCHER ──
+function setStyle(name) {
+  if (name === currentStyle) return;
+  currentStyle = name;
+  map.setStyle(OFM_STYLES[name]);
+  document.querySelectorAll('.style-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === name);
+  });
+  // Re-add markers after style loads
+  map.once('styledata', () => {
+    getAllTags().forEach(addMarker);
+  });
+  toast(`Map style: ${name}`);
+}
+
+// ── CATEGORY PILLS ──
+document.querySelectorAll('.cat-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCat = btn.dataset.cat;
+  });
+});
+
+// ── CUSTOM HTML MARKER ──
+function makeMarkerEl(category) {
+  const color = CAT_COLORS[category] || '#47c8ff';
+  const icon  = CAT_EMOJI[category]  || '●';
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38" style="cursor:pointer;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5))">
+      <path d="M15 0C6.72 0 0 6.72 0 15c0 10.5 15 23 15 23S30 25.5 30 15C30 6.72 23.28 0 15 0z" fill="${color}"/>
+      <circle cx="15" cy="14.5" r="7" fill="rgba(0,0,0,0.25)"/>
+      <text x="15" y="19" text-anchor="middle" font-size="10" font-family="monospace"
+        fill="#fff" dominant-baseline="middle" font-weight="bold">${icon}</text>
+    </svg>`;
+  return el;
+}
+
+function addMarker(tag) {
+  const el = makeMarkerEl(tag.category);
+  const popup = new maplibregl.Popup({ offset: 38, closeButton: true, maxWidth: '240px' })
+    .setHTML(`
+      <div class="popup-title">${esc(tag.label)}</div>
+      <div class="popup-cat" style="background:${CAT_COLORS[tag.category]}22;color:${CAT_COLORS[tag.category]}">${tag.category}</div>
+      <div class="popup-coords">${tag.lat.toFixed(5)}, ${tag.lng.toFixed(5)}</div>
+      ${tag.note ? `<div class="popup-note">${esc(tag.note)}</div>` : ''}
+    `);
+
+  const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+    .setLngLat([tag.lng, tag.lat])
+    .setPopup(popup)
+    .addTo(map);
+
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    setActive(tag.id);
+  });
+
+  markers[tag.id] = { marker, el };
+}
+
+function removeAllMarkers() {
+  Object.values(markers).forEach(({ marker }) => marker.remove());
+  markers = {};
+}
+
+// ── DATA ──
+function getAllTags() {
+  return offlineTags;
+}
+
+async function loadTags() {
+  try {
+    const res  = await fetch(`${API}/tags`);
+    const tags = await res.json();
+    offlineTags = tags;
+  } catch {
+    // use existing offlineTags
+  }
+  removeAllMarkers();
+  offlineTags.forEach(addMarker);
+  renderList(offlineTags);
+}
+
+function renderList(tags) {
+  document.getElementById('tag-count').textContent = tags.length;
+  const list = document.getElementById('tag-list');
+  if (!tags.length) {
+    list.innerHTML = `<div class="empty-state"><div class="big">🗺️</div>No pins yet.<br>Click the map to start.</div>`;
+    return;
+  }
+  list.innerHTML = [...tags].reverse().map(tag => `
+    <div class="tag-item${activeId === tag.id ? ' active' : ''}" data-id="${tag.id}" onclick="flyTo('${tag.id}')">
+      <div class="tag-dot" style="background:${CAT_COLORS[tag.category] || '#47c8ff'}"></div>
+      <div class="tag-body">
+        <div class="tag-name">${esc(tag.label)}</div>
+        <div class="tag-meta">${tag.lat.toFixed(4)}, ${tag.lng.toFixed(4)} · ${tag.category}</div>
+        ${tag.note ? `<div class="tag-note">${esc(tag.note)}</div>` : ''}
+      </div>
+      <button class="btn-del" onclick="event.stopPropagation();deleteTag('${tag.id}')" title="Delete">✕</button>
+    </div>
+  `).join('');
+}
+
+// ── SUBMIT ──
+async function submitTag() {
+  const lat   = parseFloat(document.getElementById('f-lat').value);
+  const lng   = parseFloat(document.getElementById('f-lng').value);
+  const label = document.getElementById('f-label').value.trim() || 'Untitled';
+  const note  = document.getElementById('f-note').value.trim();
+
+  if (isNaN(lat) || isNaN(lng)) { toast('Click the map first!', '#ff6b6b'); return; }
+
+  const body = { lat, lng, label, note, category: selectedCat };
+  let tag;
+
+  try {
+    const res = await fetch(`${API}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    tag = await res.json();
+    offlineTags.push(tag);
+  } catch {
+    tag = { ...body, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    offlineTags.push(tag);
+  }
+
+  addMarker(tag);
+  renderList(offlineTags);
+  map.flyTo({ center: [lng, lat], zoom: 14, duration: 1400, essential: true });
+  setActive(tag.id);
+  clearForm();
+  toast('📍 Pin saved!');
+}
+
+// ── DELETE ──
+async function deleteTag(id) {
+  try { await fetch(`${API}/tags/${id}`, { method: 'DELETE' }); } catch {}
+  if (markers[id]) { markers[id].marker.remove(); delete markers[id]; }
+  offlineTags = offlineTags.filter(t => t.id !== id);
+  if (activeId === id) activeId = null;
+  renderList(offlineTags);
+  toast('Pin removed', '#ff6b6b');
+}
+
+// ── FLY TO ──
+function flyTo(id) {
+  const tag = offlineTags.find(t => t.id === id);
+  if (!tag) return;
+  map.flyTo({ center: [tag.lng, tag.lat], zoom: 14, duration: 1000, essential: true });
+  markers[id]?.marker.togglePopup();
+  setActive(id);
+}
+
+function setActive(id) {
+  activeId = id;
+  document.querySelectorAll('.tag-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.id === id));
+}
+
+// ── LOCATE ──
+function locateMe() {
+  document.getElementById('status-text').textContent = 'locating…';
+  if (!navigator.geolocation) { toast('Geolocation not supported', '#ff6b6b'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    document.getElementById('f-lat').value = lat.toFixed(6);
+    document.getElementById('f-lng').value = lng.toFixed(6);
+    document.getElementById('status-text').textContent = 'location found — fill label & save';
+    map.flyTo({ center: [lng, lat], zoom: 13, duration: 1200 });
+    toast('📡 Location found!');
+  }, () => toast('Could not access location', '#ff6b6b'));
+}
+
+// ── HELPERS ──
+function clearForm() {
+  ['f-label','f-lat','f-lng','f-note'].forEach(id => document.getElementById(id).value = '');
+}
+
+let toastTimer;
+function toast(msg, color = 'var(--accent)') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderLeftColor = color;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── INIT ──
+loadTags();
+</script>
+</body>
+</html>
